@@ -25,8 +25,10 @@ defmodule Mix.Tasks.Check do
     beam = :code.which(module)
     {:ok, {^module, [abstract_code: {_, code}]}} = :beam_lib.chunks(beam, [:abstract_code])
     tree = :erl_syntax.form_list(code)
+    source = module.module_info[:compile][:source]
+    source = Path.relative_to_cwd(source)
     imports = called_remote_funs(tree)
-    Enum.reduce imports, {visited, exports}, &check_mfa/2
+    Enum.reduce imports, {visited, exports}, &check_mfa(source, &1, &2)
   end
 
   defp called_remote_funs(tree) do
@@ -36,11 +38,11 @@ defmodule Mix.Tasks.Check do
   defp pick_remote_fun(ast, acc) do
     case ast do
       {:call, line, {:remote, _, {:atom, _, mod}, {:atom, _, fun}}, args} ->
-        acc = Set.put(acc, {line, mod, fun, length(args)})
+        acc = Set.put(acc, {line, {mod, fun, length(args)}})
         if fun == :make_fun and mod == :erlang do
           case args do
             [{:atom, _, mod}, {:atom, _, fun}, {:integer, _, arity}] ->
-              acc = Set.put(acc, {line, mod, fun, arity})
+              acc = Set.put(acc, {line, {mod, fun, arity}})
             _ -> nil
           end
         end
@@ -49,8 +51,8 @@ defmodule Mix.Tasks.Check do
     acc
   end
 
-  defp check_mfa({line, mod, fun, arity}, {visited, exports}) do
-    mfa = {mod, fun, arity}
+  defp check_mfa(source, {line, mfa}, {visited, exports}) do
+    {mod, fun, arity} = mfa
     unless Set.member?(exports, mfa) do
       unless Set.member?(visited, mod) do
         visited = Set.put(visited, mod)
@@ -63,7 +65,7 @@ defmodule Mix.Tasks.Check do
         exports = Enum.reduce fa_list, exports, fn {f, a}, mfa_set -> Set.put(mfa_set, {mod, f, a}) end
       end
       unless Set.member?(exports, mfa) do
-        IO.puts "warning(@#{line}): unknown #{inspect mod}.#{fun}/#{arity}"
+        IO.puts "#{source}:#{line}: warning: unknown #{inspect mod}.#{fun}/#{arity}"
       end
     end
     {visited, exports}
