@@ -57,32 +57,43 @@ defmodule Mix.Tasks.Mfarn do
         if fun == :make_fun and mod == :erlang do
           case args do
             [{:atom, _, mod}, {:atom, _, fun}, {:integer, _, arity}] ->
-              acc = MapSet.put(acc, {line, {mod, fun, arity}})
-            _ -> nil
+              MapSet.put(acc, {line, {mod, fun, arity}})
+            _ -> acc
           end
+        else
+          acc
         end
-      _ -> nil
+      _ -> acc
     end
-    acc
   end
 
   defp check_mfa(source, {line, mfa}, {visited, exports}) do
     {mod, fun, arity} = mfa
     unless MapSet.member?(exports, mfa) do
-      unless MapSet.member?(visited, mod) do
-        visited = MapSet.put(visited, mod)
-        fa_list = try do
-          # IO.puts "? #{mod}"
-          mod.module_info[:exports]
-        catch
-          _, _ -> []
+      {visited, exports} =
+        unless MapSet.member?(visited, mod) do
+          fa_list =
+            try do
+              # IO.puts "? #{mod}"
+              mod.module_info[:exports]
+            catch
+              _, _ -> []
+            end
+          new_visited = MapSet.put(visited, mod)
+          new_exports = Enum.reduce fa_list, exports,
+            fn {f, a}, mfa_set ->
+              MapSet.put(mfa_set, {mod, f, a})
+            end
+          {new_visited, new_exports}
+        else
+          {visited, exports}
         end
-        exports = Enum.reduce fa_list, exports, fn {f, a}, mfa_set -> MapSet.put(mfa_set, {mod, f, a}) end
-      end
       unless MapSet.member?(exports, mfa) do
         IO.puts "#{source}:#{line}: warning: unknown #{inspect mod}.#{fun}/#{arity}"
       end
+      {visited, exports}
+    else
+      {visited, exports}
     end
-    {visited, exports}
   end
 end
