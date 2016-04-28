@@ -1,4 +1,4 @@
-defmodule MFArn.Mixfile do
+defmodule Mfarn.Mixfile do
   use Mix.Project
 
   def project do

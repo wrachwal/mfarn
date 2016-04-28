@@ -1,7 +1,22 @@
-defmodule Mix.Tasks.Check do
+defmodule Mix.Tasks.Mfarn do
   use Mix.Task
 
-  @shortdoc "Check remote calls"
+  @moduledoc """
+  Print warnings about remote calls (MFA) unable to find in the project.
+
+  This is sub-task intentended to be run after `compile` task.
+
+  In `mix.exs` define `compile` alias in which `mfarn` task follows `compile` task:
+
+      def project do
+        [# ...
+         aliases: aliases]
+      end
+
+      defp aliases do
+        [compile: ["compile", "mfarn"]]
+      end
+  """
 
   def run(_) do
     config = Mix.Project.config
